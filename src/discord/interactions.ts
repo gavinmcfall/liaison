@@ -277,11 +277,19 @@ async function processCreateIssue(
       issue: undefined,
     };
 
+    const typeEmoji = { bug: "\u{1F41B}", feature: "\u{1F4A1}", issue: "\u{1F4CB}" };
+
     const bodyParts = [
       description ?? "",
       "",
       "---",
-      `*Reported via Discord by **${userName}***`,
+      `### ${typeEmoji[issueType]} Reporter`,
+      "",
+      "| Field | Value |",
+      "| ----- | ----- |",
+      `| **Discord User** | ${userName} |`,
+      `| **Discord ID** | \`${user?.id ?? "unknown"}\` |`,
+      `| **Source** | Discord via [Liaison](https://github.com/gavinmcfall/liaison) |`,
     ];
 
     const labels = labelMap[issueType] ? [labelMap[issueType]!] : [];

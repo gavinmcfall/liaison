@@ -133,15 +133,19 @@ async function notifyIssueClosed(
       repository.name,
     );
 
+    // Tag the original reporter so they get pinged
+    const mention = mapping.discord_user_id
+      ? `<@${mapping.discord_user_id}> — your issue has been **closed**:`
+      : undefined;
+
     for (const guild of guilds) {
       if (!guild.channel_id) continue;
 
       try {
-        // Post to the notification channel
         await sendChannelMessage(
           env.DISCORD_BOT_TOKEN,
           guild.channel_id,
-          undefined,
+          mention,
           [embed],
         );
       } catch (error) {
@@ -152,7 +156,7 @@ async function notifyIssueClosed(
       }
     }
 
-    // DM the original reporter
+    // Also DM the original reporter
     if (mapping.discord_user_id) {
       try {
         const dmEmbed: DiscordEmbed = {
@@ -220,6 +224,10 @@ async function notifyIssueReopened(
       repository.name,
     );
 
+    const mention = mapping.discord_user_id
+      ? `<@${mapping.discord_user_id}> — your issue has been **reopened**:`
+      : undefined;
+
     for (const guild of guilds) {
       if (!guild.channel_id) continue;
 
@@ -227,7 +235,7 @@ async function notifyIssueReopened(
         await sendChannelMessage(
           env.DISCORD_BOT_TOKEN,
           guild.channel_id,
-          undefined,
+          mention,
           [embed],
         );
       } catch (error) {
@@ -298,6 +306,10 @@ async function handleIssueCommentEvent(
       repository.name,
     );
 
+    const mention = mapping.discord_user_id
+      ? `<@${mapping.discord_user_id}> — **${sender.login}** commented on your issue:`
+      : undefined;
+
     for (const guild of guilds) {
       if (!guild.channel_id) continue;
 
@@ -305,7 +317,7 @@ async function handleIssueCommentEvent(
         await sendChannelMessage(
           env.DISCORD_BOT_TOKEN,
           guild.channel_id,
-          undefined,
+          mention,
           [embed],
         );
       } catch (error) {
