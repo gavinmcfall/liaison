@@ -29,7 +29,7 @@ app.get("/health", (c) => {
 // "Interactions Endpoint URL".
 
 app.post("/discord/interactions", async (c) => {
-  return handleInteraction(c.req.raw, c.env);
+  return handleInteraction(c.req.raw, c.env, (p) => c.executionCtx.waitUntil(p));
 });
 
 // ─── GitHub Webhook Endpoint ─────────────────────────────────────────────────

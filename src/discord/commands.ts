@@ -17,8 +17,8 @@ import { ApplicationCommandOptionType, ChannelType } from "../types.js";
  *   /liaison disconnect - Remove GitHub connection
  */
 export const LIAISON_COMMAND = {
-  name: "liaison",
-  description: "Bidirectional Discord \u2194 GitHub issue tracking",
+  name: "support",
+  description: "Report issues and get updates from GitHub",
   options: [
     {
       name: "report",

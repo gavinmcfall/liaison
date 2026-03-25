@@ -33,12 +33,15 @@ import {
   startReportFlow,
 } from "./components.js";
 
+export type WaitUntil = (promise: Promise<unknown>) => void;
+
 /**
  * Handle incoming Discord interaction requests.
  */
 export async function handleInteraction(
   request: Request,
   env: Env,
+  waitUntil: WaitUntil,
 ): Promise<Response> {
   // Verify the request signature
   const signature = request.headers.get("X-Signature-Ed25519");
@@ -69,17 +72,17 @@ export async function handleInteraction(
 
   // Handle slash commands
   if (interaction.type === InteractionType.APPLICATION_COMMAND) {
-    return handleCommand(interaction, env);
+    return handleCommand(interaction, env, waitUntil);
   }
 
   // Handle select menus, buttons
   if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
-    return handleComponentInteraction(interaction, env);
+    return handleComponentInteraction(interaction, env, waitUntil);
   }
 
   // Handle modal form submissions
   if (interaction.type === InteractionType.MODAL_SUBMIT) {
-    return handleModalSubmit(interaction, env);
+    return handleModalSubmit(interaction, env, waitUntil);
   }
 
   return errorResponse("Unknown interaction type");
@@ -91,6 +94,7 @@ export async function handleInteraction(
 async function handleCommand(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil: WaitUntil,
 ): Promise<Response> {
   const subcommand = interaction.data?.options?.[0];
   if (!subcommand) {
@@ -99,23 +103,23 @@ async function handleCommand(
 
   switch (subcommand.name) {
     case "report":
-      return startReportFlow(interaction, env);
+      return startReportFlow(interaction, env, waitUntil);
     case "setup":
       return handleSetup(interaction, env);
     case "channel":
-      return handleChannel(interaction, env, subcommand.options);
+      return handleChannel(interaction, env, subcommand.options, waitUntil);
     case "product":
-      return handleProduct(interaction, env, subcommand);
+      return handleProduct(interaction, env, subcommand, waitUntil);
     case "bug":
-      return handleCreateIssue(interaction, env, subcommand.options, "bug");
+      return handleCreateIssue(interaction, env, subcommand.options, "bug", waitUntil);
     case "feature":
-      return handleCreateIssue(interaction, env, subcommand.options, "feature");
+      return handleCreateIssue(interaction, env, subcommand.options, "feature", waitUntil);
     case "issue":
-      return handleCreateIssue(interaction, env, subcommand.options, "issue");
+      return handleCreateIssue(interaction, env, subcommand.options, "issue", waitUntil);
     case "status":
-      return handleStatus(interaction, env);
+      return handleStatus(interaction, env, waitUntil);
     case "disconnect":
-      return handleDisconnect(interaction, env);
+      return handleDisconnect(interaction, env, waitUntil);
     default:
       return discordResponse("Unknown subcommand.", true);
   }
@@ -172,6 +176,7 @@ function handleChannel(
   interaction: DiscordInteraction,
   env: Env,
   options?: DiscordCommandOption[],
+  waitUntil?: WaitUntil,
 ): Response {
   if (!interaction.guild_id) {
     return discordResponse("This command can only be used in a server.", true);
@@ -205,7 +210,7 @@ function handleChannel(
   };
 
   // We'll handle the async work after returning the deferred response
-  void processChannelSetup(interaction, env, channelId);
+  waitUntil?.(processChannelSetup(interaction, env, channelId));
 
   return response;
 }
@@ -243,6 +248,7 @@ function handleCreateIssue(
   env: Env,
   options?: DiscordCommandOption[],
   issueType: "bug" | "feature" | "issue" = "issue",
+  waitUntil?: WaitUntil,
 ): Response {
   if (!interaction.guild_id) {
     return discordResponse("This command can only be used in a server.", true);
@@ -262,7 +268,7 @@ function handleCreateIssue(
   // Defer the response — creating a GitHub issue takes time
   const response = deferredResponse();
 
-  void processCreateIssue(interaction, env, title, description, issueType);
+  waitUntil?.(processCreateIssue(interaction, env, title, description, issueType));
 
   return response;
 }
@@ -436,13 +442,14 @@ async function processCreateIssue(
 function handleStatus(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Response {
   if (!interaction.guild_id) {
     return discordResponse("This command can only be used in a server.", true);
   }
 
   const response = deferredResponse(true);
-  void processStatus(interaction, env);
+  waitUntil?.(processStatus(interaction, env));
   return response;
 }
 
@@ -530,6 +537,7 @@ async function processStatus(
 function handleDisconnect(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Response {
   if (!interaction.guild_id) {
     return discordResponse("This command can only be used in a server.", true);
@@ -544,7 +552,7 @@ function handleDisconnect(
   }
 
   const response = deferredResponse(true);
-  void processDisconnect(interaction, env);
+  waitUntil?.(processDisconnect(interaction, env));
   return response;
 }
 
@@ -576,6 +584,7 @@ function handleProduct(
   interaction: DiscordInteraction,
   env: Env,
   subcommandGroup: DiscordCommandOption,
+  waitUntil?: WaitUntil,
 ): Response {
   if (!interaction.guild_id) {
     return discordResponse("This command can only be used in a server.", true);
@@ -596,11 +605,11 @@ function handleProduct(
 
   switch (subcommand.name) {
     case "add":
-      return handleProductAdd(interaction, env, subcommand.options);
+      return handleProductAdd(interaction, env, subcommand.options, waitUntil);
     case "remove":
-      return handleProductRemove(interaction, env, subcommand.options);
+      return handleProductRemove(interaction, env, subcommand.options, waitUntil);
     case "list":
-      return handleProductList(interaction, env);
+      return handleProductList(interaction, env, waitUntil);
     default:
       return discordResponse("Unknown product subcommand.", true);
   }
@@ -610,9 +619,10 @@ function handleProductAdd(
   interaction: DiscordInteraction,
   env: Env,
   options?: DiscordCommandOption[],
+  waitUntil?: WaitUntil,
 ): Response {
   const response = deferredResponse(true);
-  void processProductAdd(interaction, env, options);
+  waitUntil?.(processProductAdd(interaction, env, options));
   return response;
 }
 
@@ -710,9 +720,10 @@ function handleProductRemove(
   interaction: DiscordInteraction,
   env: Env,
   options?: DiscordCommandOption[],
+  waitUntil?: WaitUntil,
 ): Response {
   const response = deferredResponse(true);
-  void processProductRemove(interaction, env, options);
+  waitUntil?.(processProductRemove(interaction, env, options));
   return response;
 }
 
@@ -761,9 +772,10 @@ async function processProductRemove(
 function handleProductList(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Response {
   const response = deferredResponse(true);
-  void processProductList(interaction, env);
+  waitUntil?.(processProductList(interaction, env));
   return response;
 }
 

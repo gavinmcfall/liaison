@@ -27,6 +27,7 @@ import {
   guessTemplateEmoji,
   type IssueTemplate,
 } from "../github/templates.js";
+import type { WaitUntil } from "./interactions.js";
 
 /**
  * Handle MESSAGE_COMPONENT interactions (select menus, buttons).
@@ -34,6 +35,7 @@ import {
 export async function handleComponentInteraction(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Promise<Response> {
   const customId = interaction.data?.custom_id;
 
@@ -42,7 +44,7 @@ export async function handleComponentInteraction(
   }
 
   if (customId === "report:product") {
-    return handleProductSelect(interaction, env);
+    return handleProductSelect(interaction, env, waitUntil);
   }
 
   if (customId.startsWith("report:type:")) {
@@ -61,6 +63,7 @@ export async function handleComponentInteraction(
 export async function handleModalSubmit(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Promise<Response> {
   const customId = interaction.data?.custom_id;
 
@@ -69,7 +72,7 @@ export async function handleModalSubmit(
   }
 
   if (customId.startsWith("report:modal:")) {
-    return handleReportModalSubmit(interaction, env);
+    return handleReportModalSubmit(interaction, env, waitUntil);
   }
 
   return jsonResponse({
@@ -88,6 +91,7 @@ export async function handleModalSubmit(
 export async function startReportFlow(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Promise<Response> {
   if (!interaction.guild_id) {
     return jsonResponse({
@@ -122,7 +126,7 @@ export async function startReportFlow(
       data: { flags: MessageFlags.EPHEMERAL },
     });
 
-    void showTypeSelectDeferred(interaction, env, "default");
+    waitUntil?.(showTypeSelectDeferred(interaction, env, "default"));
     return response;
   }
 
@@ -133,7 +137,7 @@ export async function startReportFlow(
       data: { flags: MessageFlags.EPHEMERAL },
     });
 
-    void showTypeSelectDeferred(interaction, env, String(products[0]!.id));
+    waitUntil?.(showTypeSelectDeferred(interaction, env, String(products[0]!.id)));
     return response;
   }
 
@@ -181,6 +185,7 @@ export async function startReportFlow(
 function handleProductSelect(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Response {
   const productId = interaction.data?.values?.[0];
 
@@ -209,7 +214,7 @@ function handleProductSelect(
   });
 
   // Fetch templates and update the message
-  void showTypeSelectFollowup(interaction, env, productId);
+  waitUntil?.(showTypeSelectFollowup(interaction, env, productId));
 
   return response;
 }
@@ -413,12 +418,13 @@ function defaultTemplateName(fileName: string): string {
 function handleReportModalSubmit(
   interaction: DiscordInteraction,
   env: Env,
+  waitUntil?: WaitUntil,
 ): Response {
   const response = jsonResponse({
     type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
   });
 
-  void processReportModal(interaction, env);
+  waitUntil?.(processReportModal(interaction, env));
 
   return response;
 }

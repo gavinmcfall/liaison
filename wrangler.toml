@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "liaison-db"
-database_id = "" # Set after creating: wrangler d1 create liaison-db
+database_id = "9eef64f1-eee4-40a4-b0d3-9dfd520bc827"
 
 # Environment variables (set via wrangler secret or .dev.vars)
 # DISCORD_APPLICATION_ID  - Discord application ID
