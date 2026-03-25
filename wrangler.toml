@@ -1,0 +1,22 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "liaison"
+main = "src/index.ts"
+compatibility_date = "2025-03-10"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "liaison-db"
+database_id = "" # Set after creating: wrangler d1 create liaison-db
+
+# Environment variables (set via wrangler secret or .dev.vars)
+# DISCORD_APPLICATION_ID  - Discord application ID
+# DISCORD_PUBLIC_KEY      - Discord interaction verification key
+# DISCORD_BOT_TOKEN       - Discord bot token
+# GITHUB_APP_ID           - GitHub App ID
+# GITHUB_APP_PRIVATE_KEY  - GitHub App private key (PEM)
+# GITHUB_CLIENT_ID        - GitHub App OAuth client ID
+# GITHUB_CLIENT_SECRET    - GitHub App OAuth client secret
+# GITHUB_WEBHOOK_SECRET   - GitHub App webhook secret
+# ENCRYPTION_KEY          - 256-bit key for encrypting stored tokens (hex)

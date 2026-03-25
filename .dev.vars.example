@@ -1,0 +1,15 @@
+# Discord Application (https://discord.com/developers/applications)
+DISCORD_APPLICATION_ID=
+DISCORD_PUBLIC_KEY=
+DISCORD_BOT_TOKEN=
+
+# GitHub App (https://github.com/settings/apps)
+GITHUB_APP_ID=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_WEBHOOK_SECRET=
+
+# 256-bit hex key for encrypting GitHub tokens at rest
+# Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ENCRYPTION_KEY=
