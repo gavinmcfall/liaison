@@ -122,19 +122,22 @@ function handleSetup(
     `https://github.com/apps/liaison-bot/installations/new?state=${interaction.guild_id}`;
 
   const embed: DiscordEmbed = {
-    title: "Setup Liaison",
+    author: {
+      name: "\u{2699}\u{FE0F} Liaison Setup",
+    },
+    title: "Connect to GitHub",
     description: [
-      "To connect Liaison to your GitHub repository:",
+      "Link your GitHub repository so your community can file issues directly from Discord.",
       "",
-      `**1.** [Install the Liaison GitHub App](${installUrl})`,
-      "**2.** Select the repository you want to connect",
-      "**3.** Liaison will automatically complete the setup",
+      `> **Step 1** \u2014 [Install the Liaison GitHub App](${installUrl})`,
+      "> **Step 2** \u2014 Select the repository you want to connect",
+      "> **Step 3** \u2014 Liaison completes the setup automatically",
       "",
-      "**Then run:** `/liaison channel` to set where issue updates are posted.",
+      "\u{1F4E2} **Then run** `/liaison channel #channel` to set where updates are posted.",
     ].join("\n"),
     color: EmbedColors.SETUP,
     footer: {
-      text: "Only server administrators can complete setup.",
+      text: "Only server administrators can complete setup. \u2022 Liaison",
     },
   };
 
@@ -277,13 +280,13 @@ async function processCreateIssue(
       issue: undefined,
     };
 
-    const typeEmoji = { bug: "\u{1F41B}", feature: "\u{1F4A1}", issue: "\u{1F4CB}" };
+    const bodyEmoji = { bug: "\u{1F41B}", feature: "\u{1F4A1}", issue: "\u{1F4CB}" };
 
     const bodyParts = [
       description ?? "",
       "",
       "---",
-      `### ${typeEmoji[issueType]} Reporter`,
+      `### ${bodyEmoji[issueType]} Reporter`,
       "",
       "| Field | Value |",
       "| ----- | ----- |",
@@ -310,40 +313,46 @@ async function processCreateIssue(
       issue: EmbedColors.ISSUE,
     };
 
-    const typeLabel = {
-      bug: "Bug Report",
-      feature: "Feature Request",
-      issue: "Issue",
+    const typeConfig = {
+      bug: { label: "Bug Report", emoji: "\u{1F41B}" },
+      feature: { label: "Feature Request", emoji: "\u{1F4A1}" },
+      issue: { label: "Issue", emoji: "\u{1F4CB}" },
     };
 
+    const { label: typeLabel, emoji: typeEmoji } = typeConfig[issueType];
+
     const embed: DiscordEmbed = {
-      title: `${typeLabel[issueType]}: ${title}`,
+      author: {
+        name: `${typeEmoji} ${typeLabel}`,
+        url: issue.html_url,
+      },
+      title: title,
       description: description
-        ? description.length > 200
-          ? `${description.substring(0, 200)}...`
+        ? description.length > 300
+          ? `${description.substring(0, 300)}...`
           : description
         : undefined,
       url: issue.html_url,
       color: colorMap[issueType],
       fields: [
         {
-          name: "Issue",
-          value: `[#${issue.number}](${issue.html_url})`,
+          name: "\u{1F4CE} Issue",
+          value: `[\`#${issue.number}\`](${issue.html_url})`,
           inline: true,
         },
         {
-          name: "Reported by",
-          value: userName,
+          name: "\u{1F464} Reporter",
+          value: `<@${user?.id}>`,
           inline: true,
         },
         {
-          name: "Status",
+          name: "\u{1F7E2} Status",
           value: "Open",
           inline: true,
         },
       ],
       footer: {
-        text: `${guild.github_owner}/${guild.github_repo}`,
+        text: `${guild.github_owner}/${guild.github_repo} \u2022 Liaison`,
       },
       timestamp: new Date().toISOString(),
     };
@@ -432,38 +441,48 @@ async function processStatus(
 
     const fields: DiscordEmbed["fields"] = [];
 
-    if (guild.github_owner && guild.github_repo) {
-      fields.push({
-        name: "GitHub Repository",
-        value: `[${guild.github_owner}/${guild.github_repo}](https://github.com/${guild.github_owner}/${guild.github_repo})`,
-        inline: true,
-      });
-    } else {
-      fields.push({
-        name: "GitHub Repository",
-        value: "Not connected",
-        inline: true,
-      });
-    }
+    const repoConnected = !!(guild.github_owner && guild.github_repo);
+    const channelSet = !!guild.channel_id;
+    const appInstalled = !!guild.github_installation_id;
 
     fields.push({
-      name: "Notification Channel",
-      value: guild.channel_id ? `<#${guild.channel_id}>` : "Not set",
+      name: `${repoConnected ? "\u{2705}" : "\u{274C}"} Repository`,
+      value: repoConnected
+        ? `[${guild.github_owner}/${guild.github_repo}](https://github.com/${guild.github_owner}/${guild.github_repo})`
+        : "Not connected \u2014 run `/liaison setup`",
       inline: true,
     });
 
     fields.push({
-      name: "GitHub App",
-      value: guild.github_installation_id ? "Installed" : "Not installed",
+      name: `${channelSet ? "\u{2705}" : "\u{274C}"} Channel`,
+      value: channelSet
+        ? `<#${guild.channel_id}>`
+        : "Not set \u2014 run `/liaison channel`",
       inline: true,
     });
+
+    fields.push({
+      name: `${appInstalled ? "\u{2705}" : "\u{274C}"} GitHub App`,
+      value: appInstalled ? "Installed" : "Not installed",
+      inline: true,
+    });
+
+    const allGood = repoConnected && channelSet && appInstalled;
 
     const embed: DiscordEmbed = {
-      title: "Liaison Configuration",
-      color: EmbedColors.SETUP,
+      author: {
+        name: "\u{1F4CA} Server Status",
+      },
+      title: allGood ? "Liaison is fully configured" : "Liaison setup incomplete",
+      description: allGood
+        ? "Everything is connected. Your community can use `/liaison bug`, `/liaison feature`, and `/liaison issue` to file issues."
+        : "Complete the steps below to finish setup.",
+      color: allGood ? EmbedColors.SUCCESS : EmbedColors.ERROR,
       fields,
       footer: {
-        text: guild.setup_by ? `Configured by user ${guild.setup_by}` : "",
+        text: guild.setup_by
+          ? `Configured by user ${guild.setup_by} \u2022 Liaison`
+          : "Liaison",
       },
     };
 

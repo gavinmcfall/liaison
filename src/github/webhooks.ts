@@ -106,22 +106,33 @@ async function notifyIssueClosed(
   if (mappings.length === 0) return;
 
   const embed: DiscordEmbed = {
-    title: `Issue Closed: ${issue.title}`,
+    author: {
+      name: `\u{2705} Issue Closed`,
+      url: issue.html_url,
+    },
+    title: issue.title,
     url: issue.html_url,
+    description: `This issue has been resolved and closed by **[${sender.login}](${sender.html_url})**.`,
     color: EmbedColors.CLOSED,
+    thumbnail: { url: sender.avatar_url },
     fields: [
       {
-        name: "Issue",
-        value: `[#${issue.number}](${issue.html_url})`,
+        name: "\u{1F4CE} Issue",
+        value: `[\`#${issue.number}\`](${issue.html_url})`,
         inline: true,
       },
       {
-        name: "Closed by",
+        name: "\u{1F464} Closed by",
         value: `[${sender.login}](${sender.html_url})`,
         inline: true,
       },
+      {
+        name: "\u{26AA} Status",
+        value: "Closed",
+        inline: true,
+      },
     ],
-    footer: { text: repoFull },
+    footer: { text: `${repoFull} \u2022 Liaison` },
     timestamp: new Date().toISOString(),
   };
 
@@ -198,22 +209,33 @@ async function notifyIssueReopened(
   if (mappings.length === 0) return;
 
   const embed: DiscordEmbed = {
-    title: `Issue Reopened: ${issue.title}`,
+    author: {
+      name: `\u{1F504} Issue Reopened`,
+      url: issue.html_url,
+    },
+    title: issue.title,
     url: issue.html_url,
+    description: `This issue has been reopened by **[${sender.login}](${sender.html_url})**.`,
     color: EmbedColors.REOPENED,
+    thumbnail: { url: sender.avatar_url },
     fields: [
       {
-        name: "Issue",
-        value: `[#${issue.number}](${issue.html_url})`,
+        name: "\u{1F4CE} Issue",
+        value: `[\`#${issue.number}\`](${issue.html_url})`,
         inline: true,
       },
       {
-        name: "Reopened by",
+        name: "\u{1F464} Reopened by",
         value: `[${sender.login}](${sender.html_url})`,
         inline: true,
       },
+      {
+        name: "\u{1F7E2} Status",
+        value: "Open",
+        inline: true,
+      },
     ],
-    footer: { text: repoFull },
+    footer: { text: `${repoFull} \u2022 Liaison` },
     timestamp: new Date().toISOString(),
   };
 
@@ -279,23 +301,28 @@ async function handleIssueCommentEvent(
       : comment.body;
 
   const embed: DiscordEmbed = {
-    title: `New Comment on: ${issue.title}`,
-    url: comment.html_url,
-    description: commentBody,
-    color: EmbedColors.COMMENT,
     author: {
-      name: sender.login,
+      name: `\u{1F4AC} ${sender.login} commented`,
       url: sender.html_url,
       icon_url: sender.avatar_url,
     },
+    title: issue.title,
+    url: comment.html_url,
+    description: commentBody,
+    color: EmbedColors.COMMENT,
     fields: [
       {
-        name: "Issue",
-        value: `[#${issue.number}](${issue.html_url})`,
+        name: "\u{1F4CE} Issue",
+        value: `[\`#${issue.number}\`](${issue.html_url})`,
+        inline: true,
+      },
+      {
+        name: "\u{1F517} Comment",
+        value: `[View on GitHub](${comment.html_url})`,
         inline: true,
       },
     ],
-    footer: { text: repoFull },
+    footer: { text: `${repoFull} \u2022 Liaison` },
     timestamp: new Date().toISOString(),
   };
 
