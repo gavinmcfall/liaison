@@ -7,6 +7,7 @@ import {
   getGuildsByRepo,
   getIssueMappingsByGitHubIssue,
   updateIssueMappingState,
+  getProductsByRepo,
 } from "../db/queries.js";
 
 /**

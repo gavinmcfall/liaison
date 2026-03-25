@@ -6,18 +6,25 @@ import { ApplicationCommandOptionType, ChannelType } from "../types.js";
  *
  * Top-level command: /liaison
  * Subcommands:
- *   /liaison setup     - Connect a GitHub repo (starts GitHub App installation)
- *   /liaison channel   - Set the notification channel
- *   /liaison bug       - Report a bug (creates GitHub issue)
- *   /liaison feature   - Request a feature (creates GitHub issue)
- *   /liaison issue     - Create a generic issue
- *   /liaison status    - Show current configuration
+ *   /liaison setup      - Connect a GitHub repo (starts GitHub App installation)
+ *   /liaison channel    - Set the notification channel
+ *   /liaison report     - Interactive issue reporting (product select -> type select -> modal)
+ *   /liaison bug        - Quick bug report (single repo or with product choice)
+ *   /liaison feature    - Quick feature request
+ *   /liaison issue      - Quick generic issue
+ *   /liaison product    - Manage product configurations (admin)
+ *   /liaison status     - Show current configuration
  *   /liaison disconnect - Remove GitHub connection
  */
 export const LIAISON_COMMAND = {
   name: "liaison",
   description: "Bidirectional Discord \u2194 GitHub issue tracking",
   options: [
+    {
+      name: "report",
+      description: "Report an issue (interactive — guides you through product and type selection)",
+      type: ApplicationCommandOptionType.SUB_COMMAND,
+    },
     {
       name: "setup",
       description: "Connect a GitHub repository to this server",
@@ -38,8 +45,69 @@ export const LIAISON_COMMAND = {
       ],
     },
     {
+      name: "product",
+      description: "Manage products (maps a product name to a GitHub repo)",
+      type: ApplicationCommandOptionType.SUB_COMMAND_GROUP,
+      options: [
+        {
+          name: "add",
+          description: "Add a product to this server",
+          type: ApplicationCommandOptionType.SUB_COMMAND,
+          options: [
+            {
+              name: "name",
+              description: "Product display name (e.g. \"SC Bridge\")",
+              type: ApplicationCommandOptionType.STRING,
+              required: true,
+              max_length: 100,
+            },
+            {
+              name: "repo",
+              description: "GitHub repo in owner/name format (e.g. \"SC-Bridge/sc-bridge\")",
+              type: ApplicationCommandOptionType.STRING,
+              required: true,
+              max_length: 200,
+            },
+            {
+              name: "emoji",
+              description: "Emoji to show in the select menu (e.g. \"\uD83C\uDF10\")",
+              type: ApplicationCommandOptionType.STRING,
+              required: false,
+              max_length: 10,
+            },
+            {
+              name: "description",
+              description: "Short description for the select menu",
+              type: ApplicationCommandOptionType.STRING,
+              required: false,
+              max_length: 100,
+            },
+          ],
+        },
+        {
+          name: "remove",
+          description: "Remove a product from this server",
+          type: ApplicationCommandOptionType.SUB_COMMAND,
+          options: [
+            {
+              name: "name",
+              description: "Product name to remove",
+              type: ApplicationCommandOptionType.STRING,
+              required: true,
+              max_length: 100,
+            },
+          ],
+        },
+        {
+          name: "list",
+          description: "List all configured products",
+          type: ApplicationCommandOptionType.SUB_COMMAND,
+        },
+      ],
+    },
+    {
       name: "bug",
-      description: "Report a bug (creates a GitHub issue)",
+      description: "Quick bug report (creates a GitHub issue)",
       type: ApplicationCommandOptionType.SUB_COMMAND,
       options: [
         {
@@ -60,7 +128,7 @@ export const LIAISON_COMMAND = {
     },
     {
       name: "feature",
-      description: "Request a feature (creates a GitHub issue)",
+      description: "Quick feature request (creates a GitHub issue)",
       type: ApplicationCommandOptionType.SUB_COMMAND,
       options: [
         {
@@ -81,7 +149,7 @@ export const LIAISON_COMMAND = {
     },
     {
       name: "issue",
-      description: "Create a general issue on GitHub",
+      description: "Quick generic issue (creates a GitHub issue)",
       type: ApplicationCommandOptionType.SUB_COMMAND,
       options: [
         {

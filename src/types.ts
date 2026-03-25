@@ -37,6 +37,7 @@ export interface IssueMapping {
   github_repo_full: string;
   issue_title: string;
   issue_state: string;
+  product_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +48,19 @@ export interface WebhookRegistration {
   github_repo_full: string;
   webhook_id: number | null;
   active: number;
+  created_at: string;
+}
+
+export interface Product {
+  id: number;
+  guild_id: string;
+  name: string;
+  emoji: string | null;
+  description: string | null;
+  github_owner: string;
+  github_repo: string;
+  github_installation_id: number | null;
+  sort_order: number;
   created_at: string;
 }
 
@@ -122,6 +136,12 @@ export interface DiscordInteractionData {
   name: string;
   type: number;
   options?: DiscordCommandOption[];
+  // Component interaction fields
+  custom_id?: string;
+  component_type?: number;
+  values?: string[];
+  // Modal submit fields
+  components?: DiscordComponent[];
 }
 
 export interface DiscordCommandOption {
@@ -133,12 +153,17 @@ export interface DiscordCommandOption {
 
 export interface DiscordInteractionResponse {
   type: InteractionResponseType;
-  data?: {
-    content?: string;
-    embeds?: DiscordEmbed[];
-    flags?: number;
-    components?: DiscordComponent[];
-  };
+  data?: DiscordInteractionResponseData;
+}
+
+export interface DiscordInteractionResponseData {
+  content?: string;
+  embeds?: DiscordEmbed[];
+  flags?: number;
+  components?: DiscordComponent[];
+  // Modal fields
+  custom_id?: string;
+  title?: string;
 }
 
 export interface DiscordEmbed {
@@ -160,7 +185,40 @@ export interface DiscordComponent {
   label?: string;
   url?: string;
   custom_id?: string;
+  // Select menu fields
+  placeholder?: string;
+  options?: SelectOption[];
+  min_values?: number;
+  max_values?: number;
+  disabled?: boolean;
+  // Text input fields (modals)
+  value?: string;
+  required?: boolean;
+  min_length?: number;
+  max_length?: number;
 }
+
+export interface SelectOption {
+  label: string;
+  value: string;
+  description?: string;
+  emoji?: { name: string; id?: string };
+  default?: boolean;
+}
+
+/** Discord Component Types */
+export const ComponentType = {
+  ACTION_ROW: 1,
+  BUTTON: 2,
+  STRING_SELECT: 3,
+  TEXT_INPUT: 4,
+} as const;
+
+/** Discord Text Input Styles */
+export const TextInputStyle = {
+  SHORT: 1,
+  PARAGRAPH: 2,
+} as const;
 
 // ─── GitHub Types ────────────────────────────────────────────────────────────
 

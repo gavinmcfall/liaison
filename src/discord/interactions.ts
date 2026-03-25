@@ -22,8 +22,16 @@ import {
   deleteGuild,
   createIssueMapping,
   updateIssueMappingMessageId,
+  getProducts,
+  addProduct,
+  removeProduct,
 } from "../db/queries.js";
 import { sendChannelMessage } from "./api.js";
+import {
+  handleComponentInteraction,
+  handleModalSubmit,
+  startReportFlow,
+} from "./components.js";
 
 /**
  * Handle incoming Discord interaction requests.
@@ -64,26 +72,40 @@ export async function handleInteraction(
     return handleCommand(interaction, env);
   }
 
+  // Handle select menus, buttons
+  if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
+    return handleComponentInteraction(interaction, env);
+  }
+
+  // Handle modal form submissions
+  if (interaction.type === InteractionType.MODAL_SUBMIT) {
+    return handleModalSubmit(interaction, env);
+  }
+
   return errorResponse("Unknown interaction type");
 }
 
 /**
  * Route slash commands to their handlers.
  */
-function handleCommand(
+async function handleCommand(
   interaction: DiscordInteraction,
   env: Env,
-): Response {
+): Promise<Response> {
   const subcommand = interaction.data?.options?.[0];
   if (!subcommand) {
     return discordResponse("Unknown command.", true);
   }
 
   switch (subcommand.name) {
+    case "report":
+      return startReportFlow(interaction, env);
     case "setup":
       return handleSetup(interaction, env);
     case "channel":
       return handleChannel(interaction, env, subcommand.options);
+    case "product":
+      return handleProduct(interaction, env, subcommand);
     case "bug":
       return handleCreateIssue(interaction, env, subcommand.options, "bug");
     case "feature":
@@ -368,13 +390,14 @@ async function processCreateIssue(
     await createIssueMapping(env.DB, {
       guild_id: interaction.guild_id!,
       discord_channel_id: interaction.channel_id!,
-      discord_message_id: null, // We'll update this when we can retrieve it
+      discord_message_id: null,
       discord_user_id: user?.id ?? "",
       discord_user_name: userName,
       github_issue_number: issue.number,
       github_repo_full: `${guild.github_owner}/${guild.github_repo}`,
       issue_title: title,
       issue_state: "open",
+      product_id: null,
     });
 
     // If there's a configured notification channel, also post there
@@ -543,6 +566,250 @@ async function processDisconnect(
       env.DISCORD_APPLICATION_ID,
       interaction.token,
       "Failed to disconnect. Please try again.",
+    );
+  }
+}
+
+// ─── /liaison product (add | remove | list) ─────────────────────────────────
+
+function handleProduct(
+  interaction: DiscordInteraction,
+  env: Env,
+  subcommandGroup: DiscordCommandOption,
+): Response {
+  if (!interaction.guild_id) {
+    return discordResponse("This command can only be used in a server.", true);
+  }
+
+  const permissions = BigInt(interaction.member?.permissions ?? "0");
+  if ((permissions & 0x8n) === 0n) {
+    return discordResponse(
+      "You need **Administrator** permissions to manage products.",
+      true,
+    );
+  }
+
+  const subcommand = subcommandGroup.options?.[0];
+  if (!subcommand) {
+    return discordResponse("Unknown product subcommand.", true);
+  }
+
+  switch (subcommand.name) {
+    case "add":
+      return handleProductAdd(interaction, env, subcommand.options);
+    case "remove":
+      return handleProductRemove(interaction, env, subcommand.options);
+    case "list":
+      return handleProductList(interaction, env);
+    default:
+      return discordResponse("Unknown product subcommand.", true);
+  }
+}
+
+function handleProductAdd(
+  interaction: DiscordInteraction,
+  env: Env,
+  options?: DiscordCommandOption[],
+): Response {
+  const response = deferredResponse(true);
+  void processProductAdd(interaction, env, options);
+  return response;
+}
+
+async function processProductAdd(
+  interaction: DiscordInteraction,
+  env: Env,
+  options?: DiscordCommandOption[],
+): Promise<void> {
+  try {
+    const name = options?.find((o) => o.name === "name")?.value as string;
+    const repoFull = options?.find((o) => o.name === "repo")?.value as string;
+    const emoji = options?.find((o) => o.name === "emoji")?.value as
+      | string
+      | undefined;
+    const description = options?.find((o) => o.name === "description")?.value as
+      | string
+      | undefined;
+
+    if (!name || !repoFull) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "Please provide both a name and repo.",
+      );
+      return;
+    }
+
+    // Parse owner/repo
+    const repoParts = repoFull.split("/");
+    if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "Repo must be in `owner/name` format (e.g. `SC-Bridge/sc-bridge`).",
+      );
+      return;
+    }
+
+    const [owner, repo] = repoParts as [string, string];
+
+    // Get the guild's installation ID to share with the product
+    const guild = await getGuild(env.DB, interaction.guild_id!);
+
+    await addProduct(env.DB, {
+      guild_id: interaction.guild_id!,
+      name,
+      emoji: emoji ?? null,
+      description: description ?? null,
+      github_owner: owner,
+      github_repo: repo,
+      github_installation_id: guild?.github_installation_id ?? null,
+      sort_order: 0,
+    });
+
+    const emojiDisplay = emoji ? `${emoji} ` : "";
+
+    const embed: DiscordEmbed = {
+      author: { name: "\u{2705} Product Added" },
+      title: `${emojiDisplay}${name}`,
+      description: `Mapped to **[${owner}/${repo}](https://github.com/${owner}/${repo})**`,
+      color: EmbedColors.SUCCESS,
+      fields: [
+        {
+          name: "What's next?",
+          value:
+            "Users can now run `/liaison report` and select this product from the dropdown.",
+          inline: false,
+        },
+      ],
+      footer: { text: "Liaison" },
+    };
+
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      undefined,
+      [embed],
+    );
+  } catch (error) {
+    console.error("Failed to add product:", error);
+    const message =
+      error instanceof Error && error.message.includes("UNIQUE")
+        ? "A product with that name or repo already exists in this server."
+        : `Failed to add product: ${error instanceof Error ? error.message : "Unknown error"}`;
+
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      message,
+    );
+  }
+}
+
+function handleProductRemove(
+  interaction: DiscordInteraction,
+  env: Env,
+  options?: DiscordCommandOption[],
+): Response {
+  const response = deferredResponse(true);
+  void processProductRemove(interaction, env, options);
+  return response;
+}
+
+async function processProductRemove(
+  interaction: DiscordInteraction,
+  env: Env,
+  options?: DiscordCommandOption[],
+): Promise<void> {
+  try {
+    const name = options?.find((o) => o.name === "name")?.value as string;
+
+    if (!name) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "Please provide the product name to remove.",
+      );
+      return;
+    }
+
+    const removed = await removeProduct(env.DB, interaction.guild_id!, name);
+
+    if (removed) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        `Product **${name}** has been removed.`,
+      );
+    } else {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        `No product named **${name}** found.`,
+      );
+    }
+  } catch (error) {
+    console.error("Failed to remove product:", error);
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      "Failed to remove product. Please try again.",
+    );
+  }
+}
+
+function handleProductList(
+  interaction: DiscordInteraction,
+  env: Env,
+): Response {
+  const response = deferredResponse(true);
+  void processProductList(interaction, env);
+  return response;
+}
+
+async function processProductList(
+  interaction: DiscordInteraction,
+  env: Env,
+): Promise<void> {
+  try {
+    const products = await getProducts(env.DB, interaction.guild_id!);
+
+    if (products.length === 0) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "No products configured. Run `/liaison product add` to add one.",
+      );
+      return;
+    }
+
+    const productLines = products.map((p) => {
+      const emoji = p.emoji ? `${p.emoji} ` : "";
+      const desc = p.description ? ` — ${p.description}` : "";
+      return `${emoji}**${p.name}**${desc}\n\u{2003}\u{21B3} [\`${p.github_owner}/${p.github_repo}\`](https://github.com/${p.github_owner}/${p.github_repo})`;
+    });
+
+    const embed: DiscordEmbed = {
+      author: { name: "\u{1F4E6} Configured Products" },
+      description: productLines.join("\n\n"),
+      color: EmbedColors.SETUP,
+      footer: {
+        text: `${products.length} product${products.length === 1 ? "" : "s"} \u2022 Liaison`,
+      },
+    };
+
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      undefined,
+      [embed],
+    );
+  } catch (error) {
+    console.error("Failed to list products:", error);
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      "Failed to list products.",
     );
   }
 }

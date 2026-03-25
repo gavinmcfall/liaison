@@ -1,4 +1,4 @@
-import type { Guild, IssueMapping } from "../types.js";
+import type { Guild, IssueMapping, Product } from "../types.js";
 
 /**
  * Type-safe database query helpers for D1.
@@ -75,8 +75,8 @@ export async function createIssueMapping(
     .prepare(
       `INSERT INTO issue_mappings
        (guild_id, discord_channel_id, discord_message_id, discord_user_id, discord_user_name,
-        github_issue_number, github_repo_full, issue_title, issue_state)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        github_issue_number, github_repo_full, issue_title, issue_state, product_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       mapping.guild_id,
@@ -88,8 +88,90 @@ export async function createIssueMapping(
       mapping.github_repo_full,
       mapping.issue_title,
       mapping.issue_state,
+      mapping.product_id ?? null,
     )
     .run();
+}
+
+// ─── Product Queries ─────────────────────────────────────────────────────────
+
+export async function getProducts(
+  db: D1Database,
+  guildId: string,
+): Promise<Product[]> {
+  const result = await db
+    .prepare("SELECT * FROM products WHERE guild_id = ? ORDER BY sort_order, name")
+    .bind(guildId)
+    .all<Product>();
+  return result.results;
+}
+
+export async function getProduct(
+  db: D1Database,
+  productId: number,
+): Promise<Product | null> {
+  return db
+    .prepare("SELECT * FROM products WHERE id = ?")
+    .bind(productId)
+    .first<Product>();
+}
+
+export async function getProductByName(
+  db: D1Database,
+  guildId: string,
+  name: string,
+): Promise<Product | null> {
+  return db
+    .prepare("SELECT * FROM products WHERE guild_id = ? AND name = ?")
+    .bind(guildId, name)
+    .first<Product>();
+}
+
+export async function addProduct(
+  db: D1Database,
+  product: Omit<Product, "id" | "created_at">,
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `INSERT INTO products (guild_id, name, emoji, description, github_owner, github_repo, github_installation_id, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      product.guild_id,
+      product.name,
+      product.emoji ?? null,
+      product.description ?? null,
+      product.github_owner,
+      product.github_repo,
+      product.github_installation_id ?? null,
+      product.sort_order ?? 0,
+    )
+    .run();
+  return result.meta.last_row_id;
+}
+
+export async function removeProduct(
+  db: D1Database,
+  guildId: string,
+  productName: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare("DELETE FROM products WHERE guild_id = ? AND name = ?")
+    .bind(guildId, productName)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+export async function getProductsByRepo(
+  db: D1Database,
+  owner: string,
+  repo: string,
+): Promise<Product[]> {
+  const result = await db
+    .prepare("SELECT * FROM products WHERE github_owner = ? AND github_repo = ?")
+    .bind(owner, repo)
+    .all<Product>();
+  return result.results;
 }
 
 export async function getIssueMappingsByGitHubIssue(
@@ -143,6 +225,7 @@ export async function updateIssueMappingMessageId(
 
 /**
  * Find all guilds connected to a specific GitHub repo.
+ * Checks both the guilds table (single-repo mode) and the products table (multi-product mode).
  * Used when processing GitHub webhooks to know which Discord servers to notify.
  */
 export async function getGuildsByRepo(
@@ -151,7 +234,14 @@ export async function getGuildsByRepo(
   repo: string,
 ): Promise<Guild[]> {
   const result = await db
-    .prepare("SELECT * FROM guilds WHERE github_owner = ? AND github_repo = ?")
+    .prepare(
+      `SELECT DISTINCT g.* FROM guilds g
+       WHERE (g.github_owner = ?1 AND g.github_repo = ?2)
+          OR g.guild_id IN (
+            SELECT p.guild_id FROM products p
+            WHERE p.github_owner = ?1 AND p.github_repo = ?2
+          )`,
+    )
     .bind(owner, repo)
     .all<Guild>();
   return result.results;

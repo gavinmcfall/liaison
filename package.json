@@ -7,8 +7,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "register-commands": "npx tsx scripts/register-commands.ts",
-    "db:migrate:local": "wrangler d1 execute liaison-db --local --file=migrations/0001_initial.sql",
-    "db:migrate:remote": "wrangler d1 execute liaison-db --remote --file=migrations/0001_initial.sql",
+    "db:migrate:local": "wrangler d1 execute liaison-db --local --file=migrations/0001_initial.sql && wrangler d1 execute liaison-db --local --file=migrations/0002_products.sql",
+    "db:migrate:remote": "wrangler d1 execute liaison-db --remote --file=migrations/0001_initial.sql && wrangler d1 execute liaison-db --remote --file=migrations/0002_products.sql",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.ts'"
