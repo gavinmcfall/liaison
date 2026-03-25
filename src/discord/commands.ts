@@ -124,6 +124,12 @@ export const LIAISON_COMMAND = {
           required: false,
           max_length: 4000,
         },
+        {
+          name: "screenshot",
+          description: "Attach a screenshot or image",
+          type: ApplicationCommandOptionType.ATTACHMENT,
+          required: false,
+        },
       ],
     },
     {
@@ -145,6 +151,12 @@ export const LIAISON_COMMAND = {
           required: false,
           max_length: 4000,
         },
+        {
+          name: "screenshot",
+          description: "Attach a screenshot or image",
+          type: ApplicationCommandOptionType.ATTACHMENT,
+          required: false,
+        },
       ],
     },
     {
@@ -165,6 +177,12 @@ export const LIAISON_COMMAND = {
           type: ApplicationCommandOptionType.STRING,
           required: false,
           max_length: 4000,
+        },
+        {
+          name: "screenshot",
+          description: "Attach a screenshot or image",
+          type: ApplicationCommandOptionType.ATTACHMENT,
+          required: false,
         },
       ],
     },

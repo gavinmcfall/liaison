@@ -261,6 +261,14 @@ function handleCreateIssue(
     | string
     | undefined;
 
+  // Resolve attachment URL if provided
+  const attachmentId = options?.find((o) => o.name === "screenshot")?.value as
+    | string
+    | undefined;
+  const attachment = attachmentId
+    ? interaction.data?.resolved?.attachments?.[attachmentId]
+    : undefined;
+
   if (!title) {
     return discordResponse("Please provide a title for the issue.", true);
   }
@@ -268,7 +276,7 @@ function handleCreateIssue(
   // Defer the response — creating a GitHub issue takes time
   const response = deferredResponse();
 
-  waitUntil?.(processCreateIssue(interaction, env, title, description, issueType));
+  waitUntil?.(processCreateIssue(interaction, env, title, description, issueType, attachment?.url));
 
   return response;
 }
@@ -279,6 +287,7 @@ async function processCreateIssue(
   title: string,
   description: string | undefined,
   issueType: "bug" | "feature" | "issue",
+  screenshotUrl?: string,
 ): Promise<void> {
   try {
     const guild = await getGuild(env.DB, interaction.guild_id!);
@@ -312,6 +321,9 @@ async function processCreateIssue(
 
     const bodyParts = [
       description ?? "",
+      ...(screenshotUrl
+        ? ["", "## Screenshot", `![screenshot](${screenshotUrl})`]
+        : []),
       "",
       "---",
       `### ${bodyEmoji[issueType]} Reporter`,

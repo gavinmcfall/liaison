@@ -123,6 +123,17 @@ export interface DiscordInteraction {
   token: string;
 }
 
+export interface DiscordAttachment {
+  id: string;
+  filename: string;
+  content_type?: string;
+  size: number;
+  url: string;
+  proxy_url: string;
+  width?: number;
+  height?: number;
+}
+
 export interface DiscordUser {
   id: string;
   username: string;
@@ -142,6 +153,10 @@ export interface DiscordInteractionData {
   values?: string[];
   // Modal submit fields
   components?: DiscordComponent[];
+  // Resolved data (attachments, users, etc.)
+  resolved?: {
+    attachments?: Record<string, DiscordAttachment>;
+  };
 }
 
 export interface DiscordCommandOption {

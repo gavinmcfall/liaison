@@ -1,6 +1,7 @@
 import type {
   DiscordInteraction,
   DiscordEmbed,
+  DiscordComponent,
   Env,
 } from "../types.js";
 import {
@@ -362,44 +363,183 @@ function handleTypeSelect(
     templateFileName.toLowerCase().includes("bug") ||
     templateFileName.startsWith("_default_bug");
 
+  // Build modal fields based on issue type
+  // Discord allows up to 5 action rows (text inputs) per modal
+  const isFeatureLike =
+    templateFileName.toLowerCase().includes("feature") ||
+    templateFileName.toLowerCase().includes("enhancement") ||
+    templateFileName.startsWith("_default_feature");
+
+  const modalComponents: DiscordComponent[] = [
+    // Field 1: Title (always)
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.TEXT_INPUT,
+          custom_id: "title",
+          label: "Title",
+          style: TextInputStyle.SHORT,
+          placeholder: "Brief summary of the issue",
+          required: true,
+          min_length: 5,
+          max_length: 256,
+        },
+      ],
+    },
+  ];
+
+  if (isBugLike) {
+    // Bug reports get structured fields
+    modalComponents.push(
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "steps",
+            label: "Steps to Reproduce",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "1. Go to...\n2. Click on...\n3. See error",
+            required: true,
+            min_length: 10,
+            max_length: 2000,
+          },
+        ],
+      },
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "expected",
+            label: "Expected Behavior",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "What should have happened?",
+            required: true,
+            min_length: 5,
+            max_length: 1000,
+          },
+        ],
+      },
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "actual",
+            label: "Actual Behavior",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "What actually happened?",
+            required: true,
+            min_length: 5,
+            max_length: 1000,
+          },
+        ],
+      },
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "extra",
+            label: "Additional Context (optional)",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "Browser, OS, version, screenshot URLs, anything else relevant\u2026",
+            required: false,
+            max_length: 1000,
+          },
+        ],
+      },
+    );
+  } else if (isFeatureLike) {
+    // Feature requests get use-case focused fields
+    modalComponents.push(
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "description",
+            label: "Describe the Feature",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "What would you like to see added or changed?",
+            required: true,
+            min_length: 10,
+            max_length: 2000,
+          },
+        ],
+      },
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "usecase",
+            label: "Use Case",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "Why do you need this? What problem does it solve?",
+            required: false,
+            max_length: 1000,
+          },
+        ],
+      },
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "extra",
+            label: "Additional Context (optional)",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "Examples, mockups, screenshot URLs, links to similar features\u2026",
+            required: false,
+            max_length: 1000,
+          },
+        ],
+      },
+    );
+  } else {
+    // General issues get a simple description + context
+    modalComponents.push(
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "description",
+            label: "Description",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "Describe the issue in detail\u2026",
+            required: true,
+            min_length: 10,
+            max_length: 3000,
+          },
+        ],
+      },
+      {
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.TEXT_INPUT,
+            custom_id: "extra",
+            label: "Additional Context (optional)",
+            style: TextInputStyle.PARAGRAPH,
+            placeholder: "Screenshot URLs, links, environment details\u2026",
+            required: false,
+            max_length: 1000,
+          },
+        ],
+      },
+    );
+  }
+
   return jsonResponse({
     type: InteractionResponseType.MODAL,
     data: {
       custom_id: `report:modal:${productId}:${encodeURIComponent(templateFileName)}`,
       title: modalTitle.length > 45 ? `${modalTitle.substring(0, 42)}\u2026` : modalTitle,
-      components: [
-        {
-          type: ComponentType.ACTION_ROW,
-          components: [
-            {
-              type: ComponentType.TEXT_INPUT,
-              custom_id: "title",
-              label: "Title",
-              style: TextInputStyle.SHORT,
-              placeholder: "Brief summary of the issue",
-              required: true,
-              min_length: 5,
-              max_length: 256,
-            },
-          ],
-        },
-        {
-          type: ComponentType.ACTION_ROW,
-          components: [
-            {
-              type: ComponentType.TEXT_INPUT,
-              custom_id: "description",
-              label: "Description",
-              style: TextInputStyle.PARAGRAPH,
-              placeholder: isBugLike
-                ? "Steps to reproduce:\n1. \n2. \n3. \n\nExpected behavior:\n\nActual behavior:"
-                : "Describe what you'd like to see\u2026",
-              required: false,
-              max_length: 4000,
-            },
-          ],
-        },
-      ],
+      components: modalComponents,
     },
   });
 }
@@ -442,6 +582,11 @@ async function processReportModal(
 
     const title = getModalValue(interaction, "title");
     const description = getModalValue(interaction, "description");
+    const steps = getModalValue(interaction, "steps");
+    const expected = getModalValue(interaction, "expected");
+    const actual = getModalValue(interaction, "actual");
+    const usecase = getModalValue(interaction, "usecase");
+    const extra = getModalValue(interaction, "extra");
 
     if (!title) {
       await editInteractionResponse(
@@ -530,12 +675,39 @@ async function processReportModal(
 
     const finalTitle = titlePrefix ? `${titlePrefix}${title}` : title;
 
-    // Build the issue body
+    // Build the issue body from structured fields
     const user = interaction.member?.user;
     const userName = user?.global_name ?? user?.username ?? "Unknown";
 
+    const contentParts: string[] = [];
+
+    if (steps) {
+      // Bug report with structured fields
+      contentParts.push(
+        "## Steps to Reproduce",
+        steps,
+        "",
+        "## Expected Behavior",
+        expected ?? "_Not provided_",
+        "",
+        "## Actual Behavior",
+        actual ?? "_Not provided_",
+      );
+    } else if (description) {
+      // Feature request or general issue
+      contentParts.push(description);
+    }
+
+    if (usecase) {
+      contentParts.push("", "## Use Case", usecase);
+    }
+
+    if (extra) {
+      contentParts.push("", "## Additional Context", extra);
+    }
+
     const bodyParts = [
-      description ?? "",
+      ...contentParts,
       "",
       "---",
       `### ${templateEmoji} Reporter`,
@@ -595,17 +767,35 @@ async function processReportModal(
       });
     }
 
+    // Add screenshot/attachment link
+    fields.push({
+      name: "\uD83D\uDCF7 Screenshots",
+      value: `[Add on GitHub](${issue.html_url}#issuecomment-new)`,
+      inline: true,
+    });
+
+    // Build a summary for the embed description
+    const summaryParts: string[] = [];
+    if (steps) {
+      summaryParts.push(`**Steps:** ${steps.length > 100 ? `${steps.substring(0, 100)}\u2026` : steps}`);
+    } else if (description) {
+      summaryParts.push(
+        description.length > 300
+          ? `${description.substring(0, 300)}\u2026`
+          : description,
+      );
+    }
+    if (usecase) {
+      summaryParts.push(`**Use case:** ${usecase.length > 100 ? `${usecase.substring(0, 100)}\u2026` : usecase}`);
+    }
+
     const embed: DiscordEmbed = {
       author: {
         name: `${templateEmoji} ${templateName}`,
         url: issue.html_url,
       },
       title: finalTitle,
-      description: description
-        ? description.length > 300
-          ? `${description.substring(0, 300)}\u2026`
-          : description
-        : undefined,
+      description: summaryParts.length > 0 ? summaryParts.join("\n") : undefined,
       url: issue.html_url,
       color,
       fields,
