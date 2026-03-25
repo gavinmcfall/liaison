@@ -159,7 +159,7 @@ function handleSetup(
       "> **Step 2** \u2014 Select the repository you want to connect",
       "> **Step 3** \u2014 Liaison completes the setup automatically",
       "",
-      "\u{1F4E2} **Then run** `/liaison channel #channel` to set where updates are posted.",
+      "\u{1F4E2} **Then run** `/support channel #channel` to set where updates are posted.",
     ].join("\n"),
     color: EmbedColors.SETUP,
     footer: {
@@ -287,7 +287,7 @@ async function processCreateIssue(
       await editInteractionResponse(
         env.DISCORD_APPLICATION_ID,
         interaction.token,
-        "Liaison is not set up yet. Run `/liaison setup` first.",
+        "Liaison is not set up yet. Run `/support setup` first.",
       );
       return;
     }
@@ -464,7 +464,7 @@ async function processStatus(
       await editInteractionResponse(
         env.DISCORD_APPLICATION_ID,
         interaction.token,
-        "Liaison is not configured for this server. Run `/liaison setup` to get started.",
+        "Liaison is not configured for this server. Run `/support setup` to get started.",
       );
       return;
     }
@@ -479,7 +479,7 @@ async function processStatus(
       name: `${repoConnected ? "\u{2705}" : "\u{274C}"} Repository`,
       value: repoConnected
         ? `[${guild.github_owner}/${guild.github_repo}](https://github.com/${guild.github_owner}/${guild.github_repo})`
-        : "Not connected \u2014 run `/liaison setup`",
+        : "Not connected \u2014 run `/support setup`",
       inline: true,
     });
 
@@ -487,7 +487,7 @@ async function processStatus(
       name: `${channelSet ? "\u{2705}" : "\u{274C}"} Channel`,
       value: channelSet
         ? `<#${guild.channel_id}>`
-        : "Not set \u2014 run `/liaison channel`",
+        : "Not set \u2014 run `/support channel`",
       inline: true,
     });
 
@@ -505,7 +505,7 @@ async function processStatus(
       },
       title: allGood ? "Liaison is fully configured" : "Liaison setup incomplete",
       description: allGood
-        ? "Everything is connected. Your community can use `/liaison bug`, `/liaison feature`, and `/liaison issue` to file issues."
+        ? "Everything is connected. Your community can use `/support bug`, `/support feature`, and `/support issue` to file issues."
         : "Complete the steps below to finish setup.",
       color: allGood ? EmbedColors.SUCCESS : EmbedColors.ERROR,
       fields,
@@ -566,7 +566,7 @@ async function processDisconnect(
     await editInteractionResponse(
       env.DISCORD_APPLICATION_ID,
       interaction.token,
-      "Liaison has been disconnected from this server. All mappings have been removed.\n\nRun `/liaison setup` to reconnect.",
+      "Liaison has been disconnected from this server. All mappings have been removed.\n\nRun `/support setup` to reconnect.",
     );
   } catch (error) {
     console.error("Failed to disconnect:", error);
@@ -688,7 +688,7 @@ async function processProductAdd(
         {
           name: "What's next?",
           value:
-            "Users can now run `/liaison report` and select this product from the dropdown.",
+            "Users can now run `/support report` and select this product from the dropdown.",
           inline: false,
         },
       ],
@@ -790,7 +790,7 @@ async function processProductList(
       await editInteractionResponse(
         env.DISCORD_APPLICATION_ID,
         interaction.token,
-        "No products configured. Run `/liaison product add` to add one.",
+        "No products configured. Run `/support product add` to add one.",
       );
       return;
     }

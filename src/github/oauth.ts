@@ -10,7 +10,7 @@ import { EmbedColors, type DiscordEmbed } from "../types.js";
  * Handle the GitHub App installation callback.
  *
  * Flow:
- * 1. Admin clicks the install link from /liaison setup
+ * 1. Admin clicks the install link from /support setup
  * 2. They install the GitHub App on their repo
  * 3. GitHub redirects to our callback URL with installation_id and state (guild_id)
  * 4. We store the installation_id and repo info in D1
@@ -26,7 +26,7 @@ export async function handleGitHubCallback(
   const guildId = url.searchParams.get("state");
 
   if (!installationId || !guildId) {
-    return new Response(renderHTML("Setup Failed", "Missing installation ID or server reference. Please try `/liaison setup` again in Discord."), {
+    return new Response(renderHTML("Setup Failed", "Missing installation ID or server reference. Please try `/support setup` again in Discord."), {
       status: 400,
       headers: { "Content-Type": "text/html" },
     });
@@ -34,7 +34,7 @@ export async function handleGitHubCallback(
 
   // Handle uninstall
   if (setupAction === "uninstall") {
-    return new Response(renderHTML("App Removed", "The Liaison GitHub App has been uninstalled. Run `/liaison setup` in Discord to reconnect."), {
+    return new Response(renderHTML("App Removed", "The Liaison GitHub App has been uninstalled. Run `/support setup` in Discord to reconnect."), {
       headers: { "Content-Type": "text/html" },
     });
   }
@@ -83,7 +83,7 @@ export async function handleGitHubCallback(
           {
             name: "What's next?",
             value:
-              "Use `/liaison bug`, `/liaison feature`, or `/liaison issue` to create issues.",
+              "Use `/support bug`, `/support feature`, or `/support issue` to create issues.",
             inline: false,
           },
         ],
@@ -109,7 +109,7 @@ export async function handleGitHubCallback(
 
     return new Response(renderHTML(
       "Setup Complete!",
-      `Liaison is now connected to <strong>${repo.full_name}</strong> for your Discord server.${repoCount}<br><br>You can close this tab and return to Discord. Use <code>/liaison bug</code>, <code>/liaison feature</code>, or <code>/liaison issue</code> to create issues.`,
+      `Liaison is now connected to <strong>${repo.full_name}</strong> for your Discord server.${repoCount}<br><br>You can close this tab and return to Discord. Use <code>/support bug</code>, <code>/support feature</code>, or <code>/support issue</code> to create issues.`,
     ), {
       headers: { "Content-Type": "text/html" },
     });
@@ -117,7 +117,7 @@ export async function handleGitHubCallback(
     console.error("GitHub callback error:", error);
     return new Response(renderHTML(
       "Setup Failed",
-      `Something went wrong during setup: ${error instanceof Error ? error.message : "Unknown error"}.<br><br>Please try <code>/liaison setup</code> again in Discord.`,
+      `Something went wrong during setup: ${error instanceof Error ? error.message : "Unknown error"}.<br><br>Please try <code>/support setup</code> again in Discord.`,
     ), {
       status: 500,
       headers: { "Content-Type": "text/html" },

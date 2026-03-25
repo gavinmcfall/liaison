@@ -113,7 +113,7 @@ export async function startReportFlow(
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content:
-            "No products configured. An admin needs to run `/liaison product add` or `/liaison setup` first.",
+            "No products configured. An admin needs to run `/support product add` or `/support setup` first.",
           flags: MessageFlags.EPHEMERAL,
         },
       });
@@ -469,7 +469,7 @@ async function processReportModal(
         await editInteractionResponse(
           env.DISCORD_APPLICATION_ID,
           interaction.token,
-          "Liaison is not set up yet. Run `/liaison setup` first.",
+          "Liaison is not set up yet. Run `/support setup` first.",
         );
         return;
       }
@@ -500,7 +500,7 @@ async function processReportModal(
           await editInteractionResponse(
             env.DISCORD_APPLICATION_ID,
             interaction.token,
-            "GitHub App is not installed. Run `/liaison setup` first.",
+            "GitHub App is not installed. Run `/support setup` first.",
           );
           return;
         }
