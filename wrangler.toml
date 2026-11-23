@@ -1,6 +1,8 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "liaison"
 main = "src/index.ts"
+# NERDZ account. Pinned so CI deploys work when the token can see several accounts.
+account_id = "4214879ee537a4840de659aafb7bf201"
 compatibility_date = "2025-03-10"
 compatibility_flags = ["nodejs_compat"]
 
