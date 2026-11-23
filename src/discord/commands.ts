@@ -12,6 +12,8 @@ import { ApplicationCommandOptionType, ChannelType } from "../types.js";
  *   /liaison bug        - Quick bug report (single repo or with product choice)
  *   /liaison feature    - Quick feature request
  *   /liaison issue      - Quick generic issue
+ *   /liaison follow     - Get updates on an existing GitHub issue
+ *   /liaison unfollow   - Stop getting updates on a GitHub issue
  *   /liaison product    - Manage product configurations (admin)
  *   /liaison status     - Show current configuration
  *   /liaison disconnect - Remove GitHub connection
@@ -183,6 +185,34 @@ export const LIAISON_COMMAND = {
           description: "Attach a screenshot or image",
           type: ApplicationCommandOptionType.ATTACHMENT,
           required: false,
+        },
+      ],
+    },
+    {
+      name: "follow",
+      description: "Get updates on an existing GitHub issue, even one not filed from Discord",
+      type: ApplicationCommandOptionType.SUB_COMMAND,
+      options: [
+        {
+          name: "issue",
+          description: "GitHub issue number (e.g. 123)",
+          type: ApplicationCommandOptionType.INTEGER,
+          required: true,
+          min_value: 1,
+        },
+      ],
+    },
+    {
+      name: "unfollow",
+      description: "Stop getting updates on a GitHub issue",
+      type: ApplicationCommandOptionType.SUB_COMMAND,
+      options: [
+        {
+          name: "issue",
+          description: "GitHub issue number (e.g. 123)",
+          type: ApplicationCommandOptionType.INTEGER,
+          required: true,
+          min_value: 1,
         },
       ],
     },

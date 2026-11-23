@@ -1,4 +1,10 @@
-import type { Env, GitHubWebhookPayload, DiscordEmbed } from "../types.js";
+import type {
+  Env,
+  GitHubWebhookPayload,
+  GitHubRepository,
+  DiscordEmbed,
+  IssueMapping,
+} from "../types.js";
 import { EmbedColors } from "../types.js";
 import { verifyGitHubSignature } from "../utils/crypto.js";
 import { errorResponse, jsonResponse } from "../utils/responses.js";
@@ -137,57 +143,15 @@ async function notifyIssueClosed(
     timestamp: new Date().toISOString(),
   };
 
-  // Notify each guild that has a mapping for this issue
-  for (const mapping of mappings) {
-    const guilds = await getGuildsByRepo(
-      env.DB,
-      repository.owner.login,
-      repository.name,
-    );
-
-    // Tag the original reporter so they get pinged
-    const mention = mapping.discord_user_id
-      ? `<@${mapping.discord_user_id}> — your issue has been **closed**:`
-      : undefined;
-
-    for (const guild of guilds) {
-      if (!guild.channel_id) continue;
-
-      try {
-        await sendChannelMessage(
-          env.DISCORD_BOT_TOKEN,
-          guild.channel_id,
-          mention,
-          [embed],
-        );
-      } catch (error) {
-        console.error(
-          `Failed to notify guild ${guild.guild_id} about issue close:`,
-          error,
-        );
-      }
-    }
-
-    // Also DM the original reporter
-    if (mapping.discord_user_id) {
-      try {
-        const dmEmbed: DiscordEmbed = {
-          ...embed,
-          description: `Your issue **${issue.title}** has been closed by **${sender.login}**.`,
-        };
-
-        await sendDirectMessage(
-          env.DISCORD_BOT_TOKEN,
-          mapping.discord_user_id,
-          undefined,
-          [dmEmbed],
-        );
-      } catch (error) {
-        // User may have DMs disabled — that's OK
-        console.error("Failed to DM user:", error);
-      }
-    }
-  }
+  await notifyFollowers(env, repository, mappings, {
+    mentionText: `#${issue.number} has been **closed**:`,
+    embed,
+    dmEmbed: {
+      ...embed,
+      description: `**${issue.title}** has been closed by **${sender.login}**.`,
+    },
+    logLabel: "issue close",
+  });
 }
 
 async function notifyIssueReopened(
@@ -239,36 +203,11 @@ async function notifyIssueReopened(
     footer: { text: `${repoFull} \u2022 Liaison` },
     timestamp: new Date().toISOString(),
   };
-
-  for (const mapping of mappings) {
-    const guilds = await getGuildsByRepo(
-      env.DB,
-      repository.owner.login,
-      repository.name,
-    );
-
-    const mention = mapping.discord_user_id
-      ? `<@${mapping.discord_user_id}> — your issue has been **reopened**:`
-      : undefined;
-
-    for (const guild of guilds) {
-      if (!guild.channel_id) continue;
-
-      try {
-        await sendChannelMessage(
-          env.DISCORD_BOT_TOKEN,
-          guild.channel_id,
-          mention,
-          [embed],
-        );
-      } catch (error) {
-        console.error(
-          `Failed to notify guild ${guild.guild_id} about issue reopen:`,
-          error,
-        );
-      }
-    }
-  }
+  await notifyFollowers(env, repository, mappings, {
+    mentionText: `#${issue.number} has been **reopened**:`,
+    embed,
+    logLabel: "issue reopen",
+  });
 }
 
 // ─── Issue Comment Events ────────────────────────────────────────────────────
@@ -326,51 +265,87 @@ async function handleIssueCommentEvent(
     footer: { text: `${repoFull} \u2022 Liaison` },
     timestamp: new Date().toISOString(),
   };
+  await notifyFollowers(env, repository, mappings, {
+    mentionText: `**${sender.login}** commented on #${issue.number}:`,
+    embed,
+    dmEmbed: embed,
+    logLabel: "comment",
+  });
+}
 
-  for (const mapping of mappings) {
-    const guilds = await getGuildsByRepo(
-      env.DB,
-      repository.owner.login,
-      repository.name,
-    );
+// ─── Follower Notifications ──────────────────────────────────────────────────
 
-    const mention = mapping.discord_user_id
-      ? `<@${mapping.discord_user_id}> — **${sender.login}** commented on your issue:`
+// Discord caps message content at 2000 characters; a mention is ~22.
+const MAX_MENTIONS = 60;
+
+/**
+ * Notify everyone mapped to an issue: one channel post per connected guild
+ * (mentioning that guild's reporter and followers), plus one DM per user when
+ * `dmEmbed` is given. Each user appears once even if they have several mappings.
+ */
+async function notifyFollowers(
+  env: Env,
+  repository: GitHubRepository,
+  mappings: IssueMapping[],
+  opts: {
+    mentionText: string;
+    embed: DiscordEmbed;
+    dmEmbed?: DiscordEmbed;
+    logLabel: string;
+  },
+): Promise<void> {
+  const guilds = await getGuildsByRepo(
+    env.DB,
+    repository.owner.login,
+    repository.name,
+  );
+
+  for (const guild of guilds) {
+    if (!guild.channel_id) continue;
+
+    const userIds = [
+      ...new Set(
+        mappings
+          .filter((m) => m.guild_id === guild.guild_id && m.discord_user_id)
+          .map((m) => m.discord_user_id),
+      ),
+    ].slice(0, MAX_MENTIONS);
+
+    const content = userIds.length
+      ? `${userIds.map((id) => `<@${id}>`).join(" ")} — ${opts.mentionText}`
       : undefined;
 
-    for (const guild of guilds) {
-      if (!guild.channel_id) continue;
-
-      try {
-        await sendChannelMessage(
-          env.DISCORD_BOT_TOKEN,
-          guild.channel_id,
-          mention,
-          [embed],
-        );
-      } catch (error) {
-        console.error(
-          `Failed to notify guild ${guild.guild_id} about comment:`,
-          error,
-        );
-      }
+    try {
+      await sendChannelMessage(
+        env.DISCORD_BOT_TOKEN,
+        guild.channel_id,
+        content,
+        [opts.embed],
+      );
+    } catch (error) {
+      console.error(
+        `Failed to notify guild ${guild.guild_id} about ${opts.logLabel}:`,
+        error,
+      );
     }
+  }
 
-    // DM the original reporter about the comment
-    if (
-      mapping.discord_user_id &&
-      sender.login !== "liaison-bot" // Don't notify about our own comments
-    ) {
-      try {
-        await sendDirectMessage(
-          env.DISCORD_BOT_TOKEN,
-          mapping.discord_user_id,
-          undefined,
-          [embed],
-        );
-      } catch (error) {
-        console.error("Failed to DM user about comment:", error);
-      }
+  if (!opts.dmEmbed) return;
+
+  const dmUserIds = new Set(
+    mappings.map((m) => m.discord_user_id).filter((id) => id),
+  );
+  for (const userId of dmUserIds) {
+    try {
+      await sendDirectMessage(
+        env.DISCORD_BOT_TOKEN,
+        userId,
+        undefined,
+        [opts.dmEmbed],
+      );
+    } catch (error) {
+      // User may have DMs disabled — that's OK
+      console.error(`Failed to DM user about ${opts.logLabel}:`, error);
     }
   }
 }

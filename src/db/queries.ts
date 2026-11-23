@@ -93,6 +93,40 @@ export async function createIssueMapping(
     .run();
 }
 
+export async function findUserIssueMapping(
+  db: D1Database,
+  guildId: string,
+  repoFull: string,
+  issueNumber: number,
+  discordUserId: string,
+): Promise<IssueMapping | null> {
+  return db
+    .prepare(
+      `SELECT * FROM issue_mappings
+       WHERE guild_id = ? AND github_repo_full = ? AND github_issue_number = ? AND discord_user_id = ?
+       LIMIT 1`,
+    )
+    .bind(guildId, repoFull, issueNumber, discordUserId)
+    .first<IssueMapping>();
+}
+
+export async function deleteUserIssueMappings(
+  db: D1Database,
+  guildId: string,
+  repoFull: string,
+  issueNumber: number,
+  discordUserId: string,
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `DELETE FROM issue_mappings
+       WHERE guild_id = ? AND github_repo_full = ? AND github_issue_number = ? AND discord_user_id = ?`,
+    )
+    .bind(guildId, repoFull, issueNumber, discordUserId)
+    .run();
+  return result.meta.changes ?? 0;
+}
+
 // ─── Product Queries ─────────────────────────────────────────────────────────
 
 export async function getProducts(

@@ -68,6 +68,8 @@ Issue types are pulled directly from each repo's `.github/ISSUE_TEMPLATE/*.yml` 
 | `/liaison bug <title> [desc]` | Quick bug report (single-repo mode) |
 | `/liaison feature <title> [desc]` | Quick feature request (single-repo mode) |
 | `/liaison issue <title> [desc]` | Quick generic issue (single-repo mode) |
+| `/liaison follow <issue>` | Get pinged and DM'd about an existing issue in the connected repo, even one opened on GitHub |
+| `/liaison unfollow <issue>` | Stop getting updates on an issue |
 | `/liaison status` | Show current configuration |
 
 ### Admin Only
