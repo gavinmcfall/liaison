@@ -44,6 +44,40 @@ export async function createIssue(
 }
 
 /**
+ * Fetch a single GitHub issue. Returns null if it does not exist.
+ * The issues endpoint also returns pull requests; those carry a `pull_request` field.
+ */
+export async function getIssue(
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<(GitHubIssueResponse & { pull_request?: unknown }) | null> {
+  const response = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${issueNumber}`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "Liaison-Bot",
+      },
+    },
+  );
+
+  if (response.status === 404 || response.status === 410) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitHub API error ${response.status}: ${error}`);
+  }
+
+  return response.json() as Promise<GitHubIssueResponse & { pull_request?: unknown }>;
+}
+
+/**
  * Add a comment to a GitHub issue.
  */
 export async function addIssueComment(

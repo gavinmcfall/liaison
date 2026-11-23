@@ -15,12 +15,14 @@ import {
 import { verifyDiscordSignature } from "../utils/crypto.js";
 import { editInteractionResponse } from "./api.js";
 import { getInstallationToken } from "../github/app.js";
-import { createIssue } from "../github/api.js";
+import { createIssue, getIssue } from "../github/api.js";
 import {
   getGuild,
   upsertGuild,
   deleteGuild,
   createIssueMapping,
+  findUserIssueMapping,
+  deleteUserIssueMappings,
   updateIssueMappingMessageId,
   getProducts,
   addProduct,
@@ -116,6 +118,10 @@ async function handleCommand(
       return handleCreateIssue(interaction, env, subcommand.options, "feature", waitUntil);
     case "issue":
       return handleCreateIssue(interaction, env, subcommand.options, "issue", waitUntil);
+    case "follow":
+      return handleFollow(interaction, env, subcommand.options, "follow", waitUntil);
+    case "unfollow":
+      return handleFollow(interaction, env, subcommand.options, "unfollow", waitUntil);
     case "status":
       return handleStatus(interaction, env, waitUntil);
     case "disconnect":
@@ -445,6 +451,207 @@ async function processCreateIssue(
       env.DISCORD_APPLICATION_ID,
       interaction.token,
       `Failed to create the issue: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
+
+// ─── /liaison follow | unfollow ─────────────────────────────────────────────
+
+function handleFollow(
+  interaction: DiscordInteraction,
+  env: Env,
+  options: DiscordCommandOption[] | undefined,
+  mode: "follow" | "unfollow",
+  waitUntil?: WaitUntil,
+): Response {
+  if (!interaction.guild_id) {
+    return discordResponse("This command can only be used in a server.", true);
+  }
+
+  const issueNumber = options?.find((o) => o.name === "issue")?.value;
+  if (typeof issueNumber !== "number" || !Number.isInteger(issueNumber) || issueNumber < 1) {
+    return discordResponse("Please provide a valid issue number.", true);
+  }
+
+  const response = deferredResponse(true);
+  waitUntil?.(
+    mode === "follow"
+      ? processFollow(interaction, env, issueNumber)
+      : processUnfollow(interaction, env, issueNumber),
+  );
+  return response;
+}
+
+async function processFollow(
+  interaction: DiscordInteraction,
+  env: Env,
+  issueNumber: number,
+): Promise<void> {
+  try {
+    const guild = await getGuild(env.DB, interaction.guild_id!);
+
+    if (!guild?.github_installation_id || !guild.github_owner || !guild.github_repo) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "Liaison is not set up yet. Run `/support setup` first.",
+      );
+      return;
+    }
+
+    const repoFull = `${guild.github_owner}/${guild.github_repo}`;
+    const user = interaction.member?.user;
+    if (!user?.id) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "Could not identify your Discord account.",
+      );
+      return;
+    }
+
+    const existing = await findUserIssueMapping(
+      env.DB,
+      interaction.guild_id!,
+      repoFull,
+      issueNumber,
+      user.id,
+    );
+    if (existing) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        `You're already getting updates on **${repoFull}#${issueNumber}**.`,
+      );
+      return;
+    }
+
+    const installationToken = await getInstallationToken(
+      env.GITHUB_APP_ID,
+      env.GITHUB_APP_PRIVATE_KEY,
+      guild.github_installation_id,
+    );
+
+    const issue = await getIssue(
+      installationToken.token,
+      guild.github_owner,
+      guild.github_repo,
+      issueNumber,
+    );
+
+    if (!issue) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        `There is no issue **#${issueNumber}** in **${repoFull}**.`,
+      );
+      return;
+    }
+
+    if (issue.pull_request) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        `**#${issueNumber}** in **${repoFull}** is a pull request, not an issue. Only issues can be followed.`,
+      );
+      return;
+    }
+
+    await createIssueMapping(env.DB, {
+      guild_id: interaction.guild_id!,
+      discord_channel_id: interaction.channel_id!,
+      discord_message_id: null,
+      discord_user_id: user.id,
+      discord_user_name: user.global_name ?? user.username ?? null,
+      github_issue_number: issue.number,
+      github_repo_full: repoFull,
+      issue_title: issue.title,
+      issue_state: issue.state,
+      product_id: null,
+    });
+
+    const isOpen = issue.state === "open";
+    const embed: DiscordEmbed = {
+      author: { name: "\u{1F514} Following Issue", url: issue.html_url },
+      title: issue.title,
+      url: issue.html_url,
+      description: guild.channel_id
+        ? `You'll be pinged in <#${guild.channel_id}> and sent a DM when this issue is commented on, closed or reopened.`
+        : "You'll be sent a DM when this issue is commented on or closed.",
+      color: EmbedColors.SUCCESS,
+      fields: [
+        {
+          name: "\u{1F4CE} Issue",
+          value: `[\`#${issue.number}\`](${issue.html_url})`,
+          inline: true,
+        },
+        {
+          name: `${isOpen ? "\u{1F7E2}" : "\u{26AA}"} Status`,
+          value: isOpen ? "Open" : "Closed",
+          inline: true,
+        },
+      ],
+      footer: { text: `${repoFull} • Run /support unfollow to stop • Liaison` },
+    };
+
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      undefined,
+      [embed],
+    );
+  } catch (error) {
+    console.error("Failed to follow issue:", error);
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      `Failed to follow the issue: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
+
+async function processUnfollow(
+  interaction: DiscordInteraction,
+  env: Env,
+  issueNumber: number,
+): Promise<void> {
+  try {
+    const guild = await getGuild(env.DB, interaction.guild_id!);
+
+    if (!guild?.github_owner || !guild.github_repo) {
+      await editInteractionResponse(
+        env.DISCORD_APPLICATION_ID,
+        interaction.token,
+        "Liaison is not set up yet. Run `/support setup` first.",
+      );
+      return;
+    }
+
+    const repoFull = `${guild.github_owner}/${guild.github_repo}`;
+    const userId = interaction.member?.user?.id;
+    const removed = userId
+      ? await deleteUserIssueMappings(
+          env.DB,
+          interaction.guild_id!,
+          repoFull,
+          issueNumber,
+          userId,
+        )
+      : 0;
+
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      removed > 0
+        ? `You'll no longer get updates on **${repoFull}#${issueNumber}**.`
+        : `You weren't getting updates on **${repoFull}#${issueNumber}**.`,
+    );
+  } catch (error) {
+    console.error("Failed to unfollow issue:", error);
+    await editInteractionResponse(
+      env.DISCORD_APPLICATION_ID,
+      interaction.token,
+      "Failed to unfollow the issue. Please try again.",
     );
   }
 }
